@@ -1,5 +1,6 @@
 use super::{FileLock, IndexCache, cache::ValidCacheEntry};
 use crate::{Error, HttpError, IndexKrate, KrateName};
+use http::header;
 
 /// The default URL of the crates.io HTTP index
 pub const CRATES_IO_HTTP_INDEX: &str = "sparse+https://index.crates.io/";
@@ -14,6 +15,7 @@ pub const CRATES_IO_HTTP_INDEX: &str = "sparse+https://index.crates.io/";
 pub struct SparseIndex {
     cache: IndexCache,
     url: String,
+    auth_token: Option<header::HeaderValue>,
 }
 
 impl SparseIndex {
@@ -31,8 +33,20 @@ impl SparseIndex {
         let (path, url) = il.into_parts()?;
         Ok(Self {
             cache: IndexCache::at_path(path),
+            auth_token: None,
             url,
         })
+    }
+
+    /// Use authentication when making requests to the registry
+    ///
+    /// The token must only contain bytes allowed in HTTP headers
+    pub fn set_auth_token(&mut self, token: Option<&str>) -> Result<(), Error> {
+        self.auth_token = token
+            .map(header::HeaderValue::from_str)
+            .transpose()
+            .map_err(crate::HttpError::from)?;
+        Ok(())
     }
 
     /// Get the configuration of the index.
@@ -98,14 +112,16 @@ impl SparseIndex {
         etag: Option<&str>,
         lock: &FileLock,
     ) -> Result<http::Request<()>, Error> {
-        use http::header;
-
         let url = self.crate_url(name);
 
         let mut req = http::Request::get(url);
 
         {
             let headers = req.headers_mut().unwrap();
+
+            if let Some(token) = &self.auth_token {
+                headers.insert(header::AUTHORIZATION, token.clone());
+            }
 
             // AFAICT this does not affect responses at the moment, but could in
             // the future if there are changes to the protocol

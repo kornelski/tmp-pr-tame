@@ -118,6 +118,13 @@ impl RemoteSparseIndex {
         results.insert(prep_krate, prep_krate_res);
         results
     }
+
+    /// Use authentication when making requests to the registry
+    ///
+    /// The token must only contain bytes allowed in HTTP headers
+    pub fn set_auth_token(&mut self, token: Option<&str>) -> Result<(), Error> {
+        self.index.set_auth_token(token)
+    }
 }
 
 /// Allows **async** access to a remote HTTP sparse registry index
@@ -350,6 +357,13 @@ impl AsyncRemoteSparseIndex {
             self.krates(krates, write_cache_entries, individual_timeout, lock)
                 .await
         }))
+    }
+
+    /// Use authentication when making requests to the registry
+    ///
+    /// The token must only contain bytes allowed in HTTP headers
+    pub fn set_auth_token(&mut self, token: Option<&str>) -> Result<(), Error> {
+        self.index.set_auth_token(token)
     }
 }
 
